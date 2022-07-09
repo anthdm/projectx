@@ -9,6 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var defaultBlockTime = 5 * time.Second
+
 type ServerOpts struct {
 	Transports []Transport
 	BlockTime  time.Duration
@@ -25,6 +27,9 @@ type Server struct {
 }
 
 func NewServer(opts ServerOpts) *Server {
+	if opts.BlockTime == time.Duration(0) {
+		opts.BlockTime = defaultBlockTime
+	}
 	return &Server{
 		ServerOpts:  opts,
 		blockTime:   opts.BlockTime,
