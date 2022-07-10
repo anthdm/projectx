@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/anthdm/projectx/core"
+	"github.com/sirupsen/logrus"
 )
 
 type MessageType byte
@@ -39,38 +40,41 @@ func (msg *Message) Bytes() []byte {
 	return buf.Bytes()
 }
 
-type RPCHandler interface {
-	HandleRPC(rpc RPC) error
+type DecodedMessage struct {
+	From NetAddr
+	Data any
 }
 
-type DefaultRPCHandler struct {
-	p RPCProcessor
-}
+type RPCDecodeFunc func(RPC) (*DecodedMessage, error)
 
-func NewDefaultRPCHandler(p RPCProcessor) *DefaultRPCHandler {
-	return &DefaultRPCHandler{
-		p: p,
-	}
-}
-
-func (h *DefaultRPCHandler) HandleRPC(rpc RPC) error {
+func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 	msg := Message{}
 	if err := gob.NewDecoder(rpc.Payload).Decode(&msg); err != nil {
-		return fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
+		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"from": rpc.From,
+		"type": msg.Header,
+	}).Debug("new incoming message")
 
 	switch msg.Header {
 	case MessageTypeTx:
 		tx := new(core.Transaction)
 		if err := tx.Decode(core.NewGobTxDecoder(bytes.NewReader(msg.Data))); err != nil {
-			return err
+			return nil, err
 		}
-		return h.p.ProcessTransaction(rpc.From, tx)
+
+		return &DecodedMessage{
+			From: rpc.From,
+			Data: tx,
+		}, nil
+
 	default:
-		return fmt.Errorf("invalid message header %x", msg.Header)
+		return nil, fmt.Errorf("invalid message header %x", msg.Header)
 	}
 }
 
 type RPCProcessor interface {
-	ProcessTransaction(NetAddr, *core.Transaction) error
+	ProcessMessage(*DecodedMessage) error
 }
