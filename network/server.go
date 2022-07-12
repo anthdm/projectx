@@ -44,7 +44,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
 	}
 
-	chain, err := core.NewBlockchain(genesisBlock())
+	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
 	if err != nil {
 		return nil, err
 	}
@@ -147,6 +147,10 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	return s.memPool.Add(tx)
 }
 
+func (s *Server) broadcastBlock(b *core.Block) error {
+	return nil
+}
+
 func (s *Server) broadcastTx(tx *core.Transaction) error {
 	buf := &bytes.Buffer{}
 	if err := tx.Encode(core.NewGobTxEncoder(buf)); err != nil {
@@ -174,7 +178,13 @@ func (s *Server) createNewBlock() error {
 		return err
 	}
 
-	block, err := core.NewBlockFromPrevHeader(currentHeader, nil)
+	// For now we are going to use all transactions that are in the mempool
+	// Later on when we know the internal structure of our transaction
+	// we will implement some kind of complexity function to determine how
+	// many transactions can be included in a block.
+	txx := s.memPool.Transactions()
+
+	block, err := core.NewBlockFromPrevHeader(currentHeader, txx)
 	if err != nil {
 		return err
 	}
@@ -187,6 +197,8 @@ func (s *Server) createNewBlock() error {
 		return err
 	}
 
+	s.memPool.Flush()
+
 	return nil
 }
 
@@ -195,7 +207,7 @@ func genesisBlock() *core.Block {
 		Version:   1,
 		DataHash:  types.Hash{},
 		Height:    0,
-		Timestamp: time.Now().UnixNano(),
+		Timestamp: 000000,
 	}
 
 	b, _ := core.NewBlock(header, nil)
