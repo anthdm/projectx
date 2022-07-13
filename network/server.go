@@ -109,6 +109,8 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 	switch t := msg.Data.(type) {
 	case *core.Transaction:
 		return s.processTransaction(t)
+	case *core.Block:
+		return s.processBlock(t)
 	}
 
 	return nil
@@ -123,6 +125,16 @@ func (s *Server) broadcast(payload []byte) error {
 	return nil
 }
 
+func (s *Server) processBlock(b *core.Block) error {
+	if err := s.chain.AddBlock(b); err != nil {
+		return err
+	}
+
+	go s.broadcastBlock(b)
+
+	return nil
+}
+
 func (s *Server) processTransaction(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
 
@@ -134,11 +146,11 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 		return err
 	}
 
-	s.Logger.Log(
-		"msg", "adding new tx to mempool",
-		"hash", hash,
-		"mempoolPending", s.mempool.PendingCount(),
-	)
+	// s.Logger.Log(
+	// 	"msg", "adding new tx to mempool",
+	// 	"hash", hash,
+	// 	"mempoolPending", s.mempool.PendingCount(),
+	// )
 
 	go s.broadcastTx(tx)
 
@@ -148,7 +160,14 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 }
 
 func (s *Server) broadcastBlock(b *core.Block) error {
-	return nil
+	buf := &bytes.Buffer{}
+	if err := b.Encode(core.NewGobBlockEncoder(buf)); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeBock, buf.Bytes())
+
+	return s.broadcast(msg.Bytes())
 }
 
 func (s *Server) broadcastTx(tx *core.Transaction) error {
@@ -200,6 +219,8 @@ func (s *Server) createNewBlock() error {
 	// TODO(@anthdm): pending pool of tx should only reflect on validator nodes.
 	// Right now "normal nodes" does not have their pending pool cleared.
 	s.mempool.ClearPending()
+
+	go s.broadcastBlock(block)
 
 	return nil
 }
