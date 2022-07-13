@@ -1,0 +1,2 @@
+- remove random (tx, block, etc) from tests and use the util/random functions
+- double check what transactions to use from txpool before creating a new block
