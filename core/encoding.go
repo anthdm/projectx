@@ -6,6 +6,11 @@ import (
 	"io"
 )
 
+//
+// For now we GOB encoding is used for fast bootstrapping of the project
+// in a later phase I'm considering using Protobuffers as default encoding / decoding.
+//
+
 type Encoder[T any] interface {
 	Encode(T) error
 }
