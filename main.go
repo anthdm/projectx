@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"log"
 	"time"
@@ -21,6 +22,7 @@ func main() {
 	trLocal.Connect(trRemoteA)
 	trRemoteA.Connect(trRemoteB)
 	trRemoteB.Connect(trRemoteC)
+	trRemoteB.Connect(trRemoteA)
 	trRemoteA.Connect(trLocal)
 
 	initRemoteServers([]network.Transport{trRemoteA, trRemoteB, trRemoteC})
@@ -33,6 +35,10 @@ func main() {
 			time.Sleep(2 * time.Second)
 		}
 	}()
+
+	if err := sendGetStatusMessage(trRemoteA, "REMOTE_B"); err != nil {
+		log.Fatal(err)
+	}
 
 	// go func() {
 	// 	time.Sleep(7 * time.Second)
@@ -59,6 +65,7 @@ func initRemoteServers(trs []network.Transport) {
 
 func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network.Server {
 	opts := network.ServerOpts{
+		Transport:  tr,
 		PrivateKey: pk,
 		ID:         id,
 		Transports: []network.Transport{tr},
@@ -70,6 +77,20 @@ func makeServer(id string, tr network.Transport, pk *crypto.PrivateKey) *network
 	}
 
 	return s
+}
+
+func sendGetStatusMessage(tr network.Transport, to network.NetAddr) error {
+	var (
+		getStatusMsg = new(network.GetStatusMessage)
+		buf          = new(bytes.Buffer)
+	)
+
+	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+		return err
+	}
+	msg := network.NewMessage(network.MessageTypeGetStatus, buf.Bytes())
+
+	return tr.SendMessage(to, msg.Bytes())
 }
 
 func sendTransaction(tr network.Transport, to network.NetAddr) error {
