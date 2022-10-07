@@ -1,6 +1,11 @@
 package core
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrBlockKnown = errors.New("block already known")
 
 type Validator interface {
 	ValidateBlock(*Block) error
@@ -18,7 +23,8 @@ func NewBlockValidator(bc *Blockchain) *BlockValidator {
 
 func (v *BlockValidator) ValidateBlock(b *Block) error {
 	if v.bc.HasBlock(b.Height) {
-		return fmt.Errorf("chain already contains block (%d) with hash (%s)", b.Height, b.Hash(BlockHasher{}))
+		// return fmt.Errorf("chain already contains block (%d) with hash (%s)", b.Height, b.Hash(BlockHasher{}))
+		return ErrBlockKnown
 	}
 
 	if b.Height != v.bc.Height()+1 {
