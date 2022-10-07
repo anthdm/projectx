@@ -5,6 +5,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io"
+	"net"
 
 	"github.com/anthdm/projectx/core"
 	"github.com/sirupsen/logrus"
@@ -21,7 +22,7 @@ const (
 )
 
 type RPC struct {
-	From    NetAddr
+	From    net.Addr //string
 	Payload io.Reader
 }
 
@@ -44,7 +45,7 @@ func (msg *Message) Bytes() []byte {
 }
 
 type DecodedMessage struct {
-	From NetAddr
+	From net.Addr
 	Data any
 }
 
