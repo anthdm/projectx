@@ -29,6 +29,7 @@ func (h *Header) Bytes() []byte {
 
 type Block struct {
 	*Header
+
 	Transactions []*Transaction
 	Validator    crypto.PublicKey
 	Signature    *crypto.Signature
