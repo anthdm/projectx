@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/anthdm/projectx/api"
 	"github.com/anthdm/projectx/core"
 	"github.com/anthdm/projectx/crypto"
 	"github.com/anthdm/projectx/types"
@@ -18,6 +19,7 @@ import (
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
+	APIListenAddr string
 	SeedNodes     []string
 	ListenAddr    string
 	TCPTransport  *TCPTransport
@@ -59,6 +61,18 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	chain, err := core.NewBlockchain(opts.Logger, genesisBlock())
 	if err != nil {
 		return nil, err
+	}
+
+	// Only boot up the API server if the config has a valid port number.
+	if len(opts.APIListenAddr) > 0 {
+		apiServerCfg := api.ServerConfig{
+			Logger:     opts.Logger,
+			ListenAddr: opts.APIListenAddr,
+		}
+		apiServer := api.NewServer(apiServerCfg, chain)
+		go apiServer.Start()
+
+		opts.Logger.Log("msg", "JSON API server running", "port", opts.APIListenAddr)
 	}
 
 	peerCh := make(chan *TCPPeer)
