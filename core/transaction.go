@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/anthdm/projectx/crypto"
 	"github.com/anthdm/projectx/types"
@@ -11,6 +12,7 @@ type Transaction struct {
 	Data      []byte
 	From      crypto.PublicKey
 	Signature *crypto.Signature
+	Nonce     int64
 
 	// cached version of the tx data hash
 	hash types.Hash
@@ -18,7 +20,8 @@ type Transaction struct {
 
 func NewTransaction(data []byte) *Transaction {
 	return &Transaction{
-		Data: data,
+		Data:  data,
+		Nonce: rand.Int63n(1000000000000000),
 	}
 }
 
