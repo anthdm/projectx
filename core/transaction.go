@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/gob"
 	"fmt"
 	"math/rand"
 
@@ -8,7 +9,30 @@ import (
 	"github.com/anthdm/projectx/types"
 )
 
+type TxType byte
+
+const (
+	TxTypeCollection TxType = iota // 0x0
+	TxTypeMint                     // 0x01
+)
+
+type CollectionTx struct {
+	Fee      int64
+	MetaData []byte
+}
+
+type MintTx struct {
+	Fee             int64
+	NFT             types.Hash
+	Collection      types.Hash
+	MetaData        []byte
+	CollectionOwner crypto.PublicKey
+	Signature       crypto.Signature
+}
+
 type Transaction struct {
+	Type      TxType
+	TxInner   any
 	Data      []byte
 	From      crypto.PublicKey
 	Signature *crypto.Signature
@@ -62,4 +86,9 @@ func (tx *Transaction) Decode(dec Decoder[*Transaction]) error {
 
 func (tx *Transaction) Encode(enc Encoder[*Transaction]) error {
 	return enc.Encode(tx)
+}
+
+func init() {
+	gob.Register(CollectionTx{})
+	gob.Register(MintTx{})
 }
