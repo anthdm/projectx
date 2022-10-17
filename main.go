@@ -34,9 +34,9 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 
-	if err := sendTransaction(validatorPrivKey); err != nil {
-		panic(err)
-	}
+	// if err := sendTransaction(validatorPrivKey); err != nil {
+	// 	panic(err)
+	// }
 
 	// collectionOwnerPrivKey := crypto.GeneratePrivateKey()
 	// collectionHash := createCollectionTx(collectionOwnerPrivKey)
