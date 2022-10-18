@@ -64,6 +64,8 @@ func NewBlockFromPrevHeader(prevHeader *Header, txx []*Transaction) (*Block, err
 
 func (b *Block) AddTransaction(tx *Transaction) {
 	b.Transactions = append(b.Transactions, tx)
+	hash, _ := CalculateDataHash(b.Transactions)
+	b.DataHash = hash
 }
 
 func (b *Block) Sign(privKey crypto.PrivateKey) error {
@@ -97,6 +99,10 @@ func (b *Block) Verify() error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("%+v\n", dataHash)
+	fmt.Printf("%+v\n", b.DataHash)
+
 	if dataHash != b.DataHash {
 		return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
 	}
