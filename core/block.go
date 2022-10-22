@@ -100,9 +100,6 @@ func (b *Block) Verify() error {
 		return err
 	}
 
-	fmt.Printf("%+v\n", dataHash)
-	fmt.Printf("%+v\n", b.DataHash)
-
 	if dataHash != b.DataHash {
 		return fmt.Errorf("block (%s) has an invalid data hash", b.Hash(BlockHasher{}))
 	}

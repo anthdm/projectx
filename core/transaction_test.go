@@ -6,8 +6,28 @@ import (
 	"testing"
 
 	"github.com/anthdm/projectx/crypto"
+	"github.com/anthdm/projectx/types"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestVerifyTransactionWithTamper(t *testing.T) {
+	tx := NewTransaction(nil)
+
+	fromPrivKey := crypto.GeneratePrivateKey()
+	toPrivKey := crypto.GeneratePrivateKey()
+	hackerPrivKey := crypto.GeneratePrivateKey()
+
+	tx.From = fromPrivKey.PublicKey()
+	tx.To = toPrivKey.PublicKey()
+	tx.Value = 666
+
+	assert.Nil(t, tx.Sign(fromPrivKey))
+	tx.hash = types.Hash{}
+
+	tx.To = hackerPrivKey.PublicKey()
+
+	assert.NotNil(t, tx.Verify())
+}
 
 func TestNFTTransaction(t *testing.T) {
 	collectionTx := CollectionTx{
@@ -20,6 +40,7 @@ func TestNFTTransaction(t *testing.T) {
 		TxInner: collectionTx,
 	}
 	tx.Sign(privKey)
+	tx.hash = types.Hash{}
 
 	buf := new(bytes.Buffer)
 	assert.Nil(t, gob.NewEncoder(buf).Encode(tx))
@@ -69,6 +90,7 @@ func TestTxEncodeDecode(t *testing.T) {
 	tx := randomTxWithSignature(t)
 	buf := &bytes.Buffer{}
 	assert.Nil(t, tx.Encode(NewGobTxEncoder(buf)))
+	tx.hash = types.Hash{}
 
 	txDecoded := new(Transaction)
 	assert.Nil(t, txDecoded.Decode(NewGobTxDecoder(buf)))

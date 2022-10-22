@@ -40,7 +40,16 @@ func TestDecodeEncodeBlock(t *testing.T) {
 
 	bDecode := new(Block)
 	assert.Nil(t, bDecode.Decode(NewGobBlockDecoder(buf)))
-	assert.Equal(t, b, bDecode)
+
+	assert.Equal(t, b.Header, bDecode.Header)
+
+	for i := 0; i < len(b.Transactions); i++ {
+		b.Transactions[i].hash = types.Hash{}
+		assert.Equal(t, b.Transactions[i], bDecode.Transactions[i])
+	}
+
+	assert.Equal(t, b.Validator, bDecode.Validator)
+	assert.Equal(t, b.Signature, bDecode.Signature)
 }
 
 func randomBlock(t *testing.T, height uint32, prevBlockHash types.Hash) *Block {
