@@ -2,4 +2,4 @@
 - remove random (tx, block, etc) from tests and use the util/random functions and fix potential circular dependencies
 - double check what transactions to use from txpool before creating a new block
 - Fix error logging in blockhain.go (some logs not passing through)
-- Taks block rewards
+- Take block rewards

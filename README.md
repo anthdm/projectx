@@ -12,7 +12,7 @@ Golang 1.18 or higher
 
 > Note: this project is under heavy development! Things may change rapidly!
 
-## Instalation
+## Installation
 
 ```
 make build
