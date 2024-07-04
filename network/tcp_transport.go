@@ -17,6 +17,10 @@ func (p *TCPPeer) Send(b []byte) error {
 	return err
 }
 
+func (p *TCPPeer) Write(b []byte) (int, error) {
+	return p.conn.Write(b)
+}
+
 func (p *TCPPeer) readLoop(rpcCh chan RPC) {
 	buf := make([]byte, 4096)
 	for {

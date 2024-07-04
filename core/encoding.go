@@ -10,6 +10,8 @@ import (
 // in a later phase I'm considering using Protobuffers as default encoding / decoding.
 //
 
+type EncoderFunc[T any] func(w io.Writer) Encoder[T]
+
 type Encoder[T any] interface {
 	Encode(T) error
 }
@@ -22,7 +24,7 @@ type GobTxEncoder struct {
 	w io.Writer
 }
 
-func NewGobTxEncoder(w io.Writer) *GobTxEncoder {
+func NewGobTxEncoder(w io.Writer) Encoder[*Transaction] {
 	return &GobTxEncoder{
 		w: w,
 	}
@@ -36,7 +38,7 @@ type GobTxDecoder struct {
 	r io.Reader
 }
 
-func NewGobTxDecoder(r io.Reader) *GobTxDecoder {
+func NewGobTxDecoder(r io.Reader) Decoder[*Transaction] {
 	return &GobTxDecoder{
 		r: r,
 	}
@@ -50,7 +52,7 @@ type GobBlockEncoder struct {
 	w io.Writer
 }
 
-func NewGobBlockEncoder(w io.Writer) *GobBlockEncoder {
+func NewGobBlockEncoder(w io.Writer) Encoder[*Block] {
 	return &GobBlockEncoder{
 		w: w,
 	}
@@ -64,7 +66,7 @@ type GobBlockDecoder struct {
 	r io.Reader
 }
 
-func NewGobBlockDecoder(r io.Reader) *GobBlockDecoder {
+func NewGobBlockDecoder(r io.Reader) Decoder[*Block] {
 	return &GobBlockDecoder{
 		r: r,
 	}

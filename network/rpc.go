@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"crypto/elliptic"
+	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -40,10 +41,47 @@ func NewMessage(t MessageType, data []byte) *Message {
 	}
 }
 
-func (msg *Message) Bytes() []byte {
-	buf := &bytes.Buffer{}
-	gob.NewEncoder(buf).Encode(msg)
-	return buf.Bytes()
+func NewMessageGobEncoded(t MessageType, data any) (*Message, error) {
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(data); err != nil {
+		return nil, err
+	}
+
+	return &Message{
+		Header: t,
+		Data:   buf.Bytes(),
+	}, nil
+}
+
+func NewMessageWithEncoder[T any](
+	t MessageType,
+	encFactory func(writer io.Writer) core.Encoder[T],
+	data T,
+) (*Message, error) {
+	buf := new(bytes.Buffer)
+	if err := encFactory(buf).Encode(data); err != nil {
+		return nil, err
+	}
+
+	return &Message{
+		Header: t,
+		Data:   buf.Bytes(),
+	}, nil
+}
+
+func (msg *Message) WriteTo(w io.Writer) (int64, error) {
+	n, err := w.Write([]byte{byte(msg.Header)})
+	if err != nil {
+		return 0, err
+	}
+	if err = binary.Write(w, binary.LittleEndian, len(msg.Data)); err != nil {
+		return 0, err
+	}
+	if n, err = w.Write(msg.Data); err != nil {
+		return 0, err
+	}
+
+	return int64(1 + binary.Size(len(msg.Data)) + n), err
 }
 
 type DecodedMessage struct {
@@ -54,12 +92,22 @@ type DecodedMessage struct {
 type RPCDecodeFunc func(RPC) (*DecodedMessage, error)
 
 func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
-	msg := Message{}
-	if err := gob.NewDecoder(rpc.Payload).Decode(&msg); err != nil {
-		return nil, fmt.Errorf("failed to decode message from %s: %s", rpc.From, err)
+	buf := make([]byte, 1)
+	if _, err := rpc.Payload.Read(buf); err != nil {
+		return nil, err
 	}
-
-	// fmt.Printf("receiving message: %+v\n", msg)
+	var dataLen int
+	if err := binary.Read(rpc.Payload, binary.LittleEndian, &dataLen); err != nil {
+		return nil, err
+	}
+	msg := Message{
+		Header: MessageType(buf[0]),
+		Data:   make([]byte, dataLen),
+	}
+	if _, err := rpc.Payload.Read(msg.Data); err != nil {
+		return nil, err
+	}
+	fmt.Printf("receiving message: %+v\n", msg)
 
 	logrus.WithFields(logrus.Fields{
 		"from": rpc.From,
@@ -77,7 +125,6 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: tx,
 		}, nil
-
 	case MessageTypeBlock:
 		block := new(core.Block)
 		if err := block.Decode(core.NewGobBlockDecoder(bytes.NewReader(msg.Data))); err != nil {
@@ -105,7 +152,6 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: statusMessage,
 		}, nil
-
 	case MessageTypeGetBlocks:
 		getBlocks := new(GetBlocksMessage)
 		if err := gob.NewDecoder(bytes.NewReader(msg.Data)).Decode(getBlocks); err != nil {
@@ -127,7 +173,6 @@ func DefaultRPCDecodeFunc(rpc RPC) (*DecodedMessage, error) {
 			From: rpc.From,
 			Data: blocks,
 		}, nil
-
 	default:
 		return nil, fmt.Errorf("invalid message header %x", msg.Header)
 	}

@@ -2,8 +2,8 @@ package network
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"sync"
@@ -218,7 +218,7 @@ func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) 
 	s.Logger.Log("msg", "received getBlocks message", "from", from)
 
 	var (
-		blocks    = []*core.Block{}
+		blocks    []*core.Block
 		ourHeight = s.chain.Height()
 	)
 
@@ -232,46 +232,43 @@ func (s *Server) processGetBlocksMessage(from net.Addr, data *GetBlocksMessage) 
 			blocks = append(blocks, block)
 		}
 	}
-
-	blocksMsg := &BlocksMessage{
+	msg, err := NewMessageGobEncoded(MessageTypeBlocks, &BlocksMessage{
 		Blocks: blocks,
-	}
-
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(blocksMsg); err != nil {
+	})
+	if err != nil {
 		return err
 	}
-
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
-	msg := NewMessage(MessageTypeBlocks, buf.Bytes())
 	peer, ok := s.peerMap[from]
 	if !ok {
 		return fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
 	}
 
-	return peer.Send(msg.Bytes())
+	return writeTo(msg, peer)
+}
+
+func writeTo(msg io.WriterTo, w io.Writer) (err error) {
+	_, err = msg.WriteTo(w)
+
+	return err
 }
 
 func (s *Server) sendGetStatusMessage(peer *TCPPeer) error {
-	var (
-		getStatusMsg = new(GetStatusMessage)
-		buf          = new(bytes.Buffer)
-	)
-	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+	msg, err := NewMessageGobEncoded(MessageTypeGetStatus, new(GetStatusMessage))
+	if err != nil {
 		return err
 	}
 
-	msg := NewMessage(MessageTypeGetStatus, buf.Bytes())
-	return peer.Send(msg.Bytes())
+	return writeTo(msg, peer)
 }
 
-func (s *Server) broadcast(payload []byte) error {
+func (s *Server) broadcast(w io.WriterTo) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
 	for netAddr, peer := range s.peerMap {
-		if err := peer.Send(payload); err != nil {
+		if _, err := w.WriteTo(peer); err != nil {
 			fmt.Printf("peer send error => addr %s [err: %s]\n", netAddr, err)
 		}
 	}
@@ -305,16 +302,14 @@ func (s *Server) processStatusMessage(from net.Addr, data *StatusMessage) error 
 	return nil
 }
 
-func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) error {
+func (s *Server) processGetStatusMessage(from net.Addr, _ *GetStatusMessage) error {
 	s.Logger.Log("msg", "received getStatus message", "from", from)
 
-	statusMessage := &StatusMessage{
+	msg, err := NewMessageGobEncoded(MessageTypeStatus, &StatusMessage{
 		CurrentHeight: s.chain.Height(),
 		ID:            s.ID,
-	}
-
-	buf := new(bytes.Buffer)
-	if err := gob.NewEncoder(buf).Encode(statusMessage); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 
@@ -326,9 +321,7 @@ func (s *Server) processGetStatusMessage(from net.Addr, data *GetStatusMessage) 
 		return fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
 	}
 
-	msg := NewMessage(MessageTypeStatus, buf.Bytes())
-
-	return peer.Send(msg.Bytes())
+	return writeTo(msg, peer)
 }
 
 func (s *Server) processBlock(b *core.Block) error {
@@ -381,24 +374,19 @@ func (s *Server) requestBlocksLoop(peer net.Addr) error {
 			From: ourHeight + 1,
 			To:   0,
 		}
-
-		buf := new(bytes.Buffer)
-		if err := gob.NewEncoder(buf).Encode(getBlocksMessage); err != nil {
+		msg, err := NewMessageGobEncoded(MessageTypeGetBlocks, getBlocksMessage)
+		if err != nil {
 			return err
 		}
-
 		s.mu.RLock()
-		defer s.mu.RUnlock()
-
-		msg := NewMessage(MessageTypeGetBlocks, buf.Bytes())
 		peer, ok := s.peerMap[peer]
 		if !ok {
 			return fmt.Errorf("peer %s not known", peer.conn.RemoteAddr())
 		}
-
-		if err := peer.Send(msg.Bytes()); err != nil {
-			s.Logger.Log("error", "failed to send to peer", "err", err, "peer", peer)
+		if _, err := msg.WriteTo(peer); err != nil {
+			_ = s.Logger.Log("error", "failed to send to peer", "err", err, "peer", peer)
 		}
+		s.mu.RUnlock()
 
 		<-ticker.C
 	}
@@ -409,10 +397,12 @@ func (s *Server) broadcastBlock(b *core.Block) error {
 	if err := b.Encode(core.NewGobBlockEncoder(buf)); err != nil {
 		return err
 	}
+	msg, err := NewMessageWithEncoder(MessageTypeBlock, core.NewGobBlockEncoder, b)
+	if err != nil {
+		return err
+	}
 
-	msg := NewMessage(MessageTypeBlock, buf.Bytes())
-
-	return s.broadcast(msg.Bytes())
+	return s.broadcast(msg)
 }
 
 func (s *Server) broadcastTx(tx *core.Transaction) error {
@@ -423,7 +413,7 @@ func (s *Server) broadcastTx(tx *core.Transaction) error {
 
 	msg := NewMessage(MessageTypeTx, buf.Bytes())
 
-	return s.broadcast(msg.Bytes())
+	return s.broadcast(msg)
 }
 
 func (s *Server) createNewBlock() error {

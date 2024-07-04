@@ -34,21 +34,21 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 
-	// if err := sendTransaction(validatorPrivKey); err != nil {
-	// 	panic(err)
-	// }
+	if err := sendTransaction(validatorPrivKey); err != nil {
+		panic(err)
+	}
 
-	// collectionOwnerPrivKey := crypto.GeneratePrivateKey()
-	// collectionHash := createCollectionTx(collectionOwnerPrivKey)
+	collectionOwnerPrivKey := crypto.GeneratePrivateKey()
+	collectionHash := createCollectionTx(collectionOwnerPrivKey)
 
-	// txSendTicker := time.NewTicker(1 * time.Second)
-	// go func() {
-	// 	for i := 0; i < 20; i++ {
-	// 		nftMinter(collectionOwnerPrivKey, collectionHash)
+	txSendTicker := time.NewTicker(1 * time.Second)
+	go func() {
+		for i := 0; i < 20; i++ {
+			nftMinter(collectionOwnerPrivKey, collectionHash)
 
-	// 		<-txSendTicker.C
-	// 	}
-	// }()
+			<-txSendTicker.C
+		}
+	}()
 
 	select {}
 }
