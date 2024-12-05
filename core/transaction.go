@@ -53,20 +53,21 @@ func NewTransaction(data []byte) *Transaction {
 }
 
 func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
+	hash := hasher.Hash(tx)
 	if tx.hash.IsZero() {
-		tx.hash = hasher.Hash(tx)
+		tx.hash = hash
 	}
-	return tx.hash
+	return hash
 }
 
 func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
+	tx.From = privKey.PublicKey()
 	hash := tx.Hash(TxHasher{})
 	sig, err := privKey.Sign(hash.ToSlice())
 	if err != nil {
 		return err
 	}
 
-	tx.From = privKey.PublicKey()
 	tx.Signature = sig
 
 	return nil
