@@ -106,3 +106,18 @@ func randomTxWithSignature(t *testing.T) *Transaction {
 
 	return &tx
 }
+
+func TestTemperTxData(t *testing.T) {
+	userA := crypto.GeneratePrivateKey()
+	userB := crypto.GeneratePrivateKey()
+	tx := &Transaction{
+		From:  userA.PublicKey(),
+		To:    userB.PublicKey(),
+		Value: 666,
+		Data:  []byte("user a send 666 to user b"),
+	}
+	assert.Nil(t, tx.Sign(userA))
+	assert.Nil(t, tx.Verify())
+	tx.Data = []byte("hhh")
+	assert.NotNil(t, tx.Verify())
+}
